@@ -36,3 +36,6 @@ rebase: ## Rebase chart onto a new upstream version
 
 finish-rebase: ## Finalize a successful rebase (commit applied result)
 	@python3 scripts/finish_rebase.py --chart $(CHART)
+
+abort-rebase: ## Roll back an in-progress rebase
+	@python3 scripts/abort_rebase.py --chart $(CHART)
