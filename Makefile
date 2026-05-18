@@ -39,3 +39,6 @@ finish-rebase: ## Finalize a successful rebase (commit applied result)
 
 abort-rebase: ## Roll back an in-progress rebase
 	@python3 scripts/abort_rebase.py --chart $(CHART)
+
+status: ## Show all charts and their current state
+	@python3 scripts/status.py
