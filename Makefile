@@ -20,3 +20,7 @@ help: ## Show this help
 	@echo ""
 	@echo "Environment:"
 	@echo "  CHART_REBASE_PROXY  HTTP/HTTPS proxy URL passed to curl as --proxy"
+
+adopt: ## Adopt an existing chart and auto-detect base version
+	@python3 scripts/adopt.py --chart $(CHART) --repo $(REPO) \
+		$(if $(NAME),--name $(NAME),) $(if $(VERSION),--version $(VERSION),)
