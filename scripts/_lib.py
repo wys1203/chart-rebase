@@ -132,3 +132,27 @@ def curl_download(url: str, dest: Path, timeout: int = 300) -> None:
     args = _curl_base_args() + [url, "-o", str(tmp)]
     subprocess.run(args, check=True, timeout=timeout)
     tmp.rename(dest)
+
+
+_GITIGNORE_ENTRIES = [".cache/", ".work/", "__pycache__/"]
+
+
+def ensure_workspace(root: Path) -> None:
+    """Create .cache and .work dirs, ensure .gitignore lists them.
+
+    Idempotent. Safe to call at the start of any command.
+    """
+    (root / ".cache").mkdir(exist_ok=True)
+    (root / ".work").mkdir(exist_ok=True)
+
+    gitignore_path = root / ".gitignore"
+    existing = gitignore_path.read_text().splitlines() if gitignore_path.exists() else []
+    existing_set = set(existing)
+    additions = [e for e in _GITIGNORE_ENTRIES if e not in existing_set]
+    if additions:
+        with gitignore_path.open("a", encoding="utf-8") as f:
+            if existing and not existing[-1].endswith("\n") and existing[-1] != "":
+                # ensure a newline before appending
+                pass
+            for entry in additions:
+                f.write(entry + "\n")

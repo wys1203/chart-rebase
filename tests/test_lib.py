@@ -85,5 +85,41 @@ class UrlResolutionTests(unittest.TestCase):
         )
 
 
+class WorkspaceTests(unittest.TestCase):
+    def test_creates_cache_and_work_dirs(self):
+        with TemporaryDirectory() as d:
+            root = Path(d)
+            _lib.ensure_workspace(root)
+            self.assertTrue((root / ".cache").is_dir())
+            self.assertTrue((root / ".work").is_dir())
+
+    def test_creates_gitignore_when_missing(self):
+        with TemporaryDirectory() as d:
+            root = Path(d)
+            _lib.ensure_workspace(root)
+            gi = (root / ".gitignore").read_text()
+            self.assertIn(".cache/", gi)
+            self.assertIn(".work/", gi)
+            self.assertIn("__pycache__/", gi)
+
+    def test_appends_missing_entries_to_existing_gitignore(self):
+        with TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".gitignore").write_text("node_modules/\n")
+            _lib.ensure_workspace(root)
+            gi = (root / ".gitignore").read_text()
+            self.assertIn("node_modules/", gi)
+            self.assertIn(".cache/", gi)
+            self.assertIn(".work/", gi)
+
+    def test_does_not_duplicate_existing_entries(self):
+        with TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".gitignore").write_text(".cache/\n.work/\n__pycache__/\n")
+            _lib.ensure_workspace(root)
+            gi = (root / ".gitignore").read_text()
+            self.assertEqual(gi.count(".cache/"), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
