@@ -1,0 +1,35 @@
+apiVersion: v1
+entries:
+  ambient:
+  - apiVersion: v2
+    appVersion: 1.30.0-rc.0
+    name: ambient
+    urls:
+    - https://example.com/charts/samples/ambient-1.30.0-rc.0.tgz
+    version: 1.30.0-rc.0
+  - apiVersion: v2
+    appVersion: 1.30.0-beta.0
+    name: ambient
+    urls:
+    - https://example.com/charts/samples/ambient-1.30.0-beta.0.tgz
+    version: 1.30.0-beta.0
+  gateway:
+  - apiVersion: v2
+    appVersion: 1.22.0
+    name: gateway
+    urls:
+    - https://example.com/charts/gateway-1.22.0.tgz
+    version: 1.22.0
+  - apiVersion: v2
+    appVersion: 1.21.0
+    name: gateway
+    urls:
+    - https://example.com/charts/gateway-1.21.0.tgz
+    version: 1.21.0
+  - apiVersion: v2
+    appVersion: 1.20.3
+    name: gateway
+    urls:
+    - relative/gateway-1.20.3.tgz
+    version: 1.20.3
+generated: "2026-05-05T20:02:41Z"
