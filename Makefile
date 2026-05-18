@@ -24,3 +24,6 @@ help: ## Show this help
 adopt: ## Adopt an existing chart and auto-detect base version
 	@python3 scripts/adopt.py --chart $(CHART) --repo $(REPO) \
 		$(if $(NAME),--name $(NAME),) $(if $(VERSION),--version $(VERSION),)
+
+diff: ## Show local mods vs vendor baseline
+	@python3 scripts/diff.py --chart $(CHART)
