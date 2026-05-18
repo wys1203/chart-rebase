@@ -27,3 +27,6 @@ adopt: ## Adopt an existing chart and auto-detect base version
 
 diff: ## Show local mods vs vendor baseline
 	@python3 scripts/diff.py --chart $(CHART)
+
+patch: ## Emit local mods as patch (default squash; SPLIT=1 for per-commit)
+	@python3 scripts/patch.py --chart $(CHART) $(if $(SPLIT),--split,)
