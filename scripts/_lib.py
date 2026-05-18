@@ -146,13 +146,12 @@ def ensure_workspace(root: Path) -> None:
     (root / ".work").mkdir(exist_ok=True)
 
     gitignore_path = root / ".gitignore"
-    existing = gitignore_path.read_text().splitlines() if gitignore_path.exists() else []
-    existing_set = set(existing)
+    raw_text = gitignore_path.read_text() if gitignore_path.exists() else ""
+    existing_set = set(raw_text.splitlines())
     additions = [e for e in _GITIGNORE_ENTRIES if e not in existing_set]
     if additions:
         with gitignore_path.open("a", encoding="utf-8") as f:
-            if existing and not existing[-1].endswith("\n") and existing[-1] != "":
-                # ensure a newline before appending
-                pass
+            if raw_text and not raw_text.endswith("\n"):
+                f.write("\n")
             for entry in additions:
                 f.write(entry + "\n")

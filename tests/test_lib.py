@@ -120,6 +120,16 @@ class WorkspaceTests(unittest.TestCase):
             gi = (root / ".gitignore").read_text()
             self.assertEqual(gi.count(".cache/"), 1)
 
+    def test_appends_to_gitignore_without_trailing_newline(self):
+        with TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".gitignore").write_text("node_modules/")
+            _lib.ensure_workspace(root)
+            lines = (root / ".gitignore").read_text().splitlines()
+            self.assertIn("node_modules/", lines)
+            self.assertIn(".cache/", lines)
+            self.assertIn(".work/", lines)
+
 
 if __name__ == "__main__":
     unittest.main()
