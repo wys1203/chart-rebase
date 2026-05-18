@@ -5,7 +5,9 @@ Pure stdlib. Wraps curl/git/tar via subprocess for I/O and external tooling.
 
 import json
 import os
+import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -155,3 +157,60 @@ def ensure_workspace(root: Path) -> None:
                 f.write("\n")
             for entry in additions:
                 f.write(entry + "\n")
+
+
+def make_orphan_vendor_commit(
+    repo_root: Path,
+    local_dir: str,
+    pristine_root: Path,
+    version: str,
+) -> str:
+    """Create an orphan git commit whose tree contains only <local_dir>/ = pristine_root contents.
+
+    Tags the commit as vendor/<local_dir>/<version>. Returns the commit SHA.
+
+    Refuses to overwrite an existing tag of the same name.
+    """
+    tag_name = f"vendor/{local_dir}/{version}"
+    # Check tag does not already exist
+    existing = subprocess.run(
+        ["git", "-C", str(repo_root), "tag", "-l", tag_name],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    if existing:
+        raise RuntimeError(f"Tag {tag_name} already exists; refusing to overwrite")
+
+    with tempfile.TemporaryDirectory(dir=str(repo_root / ".work")) as tmp:
+        staging = Path(tmp) / "staging"
+        index_file = Path(tmp) / "index"
+
+        # Copy pristine into staging/<local_dir>/
+        target = staging / local_dir
+        shutil.copytree(pristine_root, target)
+
+        env = {**os.environ, "GIT_INDEX_FILE": str(index_file)}
+
+        # Stage all files under <local_dir>/ into the temp index
+        subprocess.run(
+            ["git", "-C", str(repo_root), "--work-tree", str(staging),
+             "add", "-A", local_dir],
+            env=env, check=True,
+        )
+
+        tree_sha = subprocess.run(
+            ["git", "-C", str(repo_root), "write-tree"],
+            env=env, capture_output=True, text=True, check=True,
+        ).stdout.strip()
+
+        commit_sha = subprocess.run(
+            ["git", "-C", str(repo_root), "commit-tree", tree_sha,
+             "-m", f"vendor: {local_dir} {version}"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+
+        subprocess.run(
+            ["git", "-C", str(repo_root), "tag", tag_name, commit_sha],
+            check=True,
+        )
+
+    return commit_sha
