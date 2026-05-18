@@ -10,9 +10,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _lib
 
 
-CONFLICT_MARKERS = ("<<<<<<< ", "=======\n", ">>>>>>> ")
-
-
 def find_conflict_files(chart_dir: Path):
     out = []
     for p in chart_dir.rglob("*"):
@@ -52,6 +49,17 @@ def main():
         ["git", "-C", str(repo_root), "add", f"{args.chart}/", "charts.json"],
         check=True,
     )
+
+    # Check whether there's anything staged before committing
+    status = subprocess.run(
+        ["git", "-C", str(repo_root), "diff", "--cached", "--quiet"],
+        check=False,
+    )
+    if status.returncode == 0:
+        print(f"error: nothing staged to commit. is a rebase actually in progress?",
+              file=sys.stderr)
+        return 1
+
     subprocess.run(
         ["git", "-C", str(repo_root), "commit",
          "-m", f"chore({args.chart}): rebase onto upstream {new_version}"],

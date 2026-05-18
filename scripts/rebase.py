@@ -106,13 +106,20 @@ def main():
         shutil.rmtree(target)
     shutil.copytree(pristine, target)
 
-    # Step 5: apply squash diff with 3-way merge
-    print(f"applying local mods with 3-way merge ...")
-    apply_result = subprocess.run(
-        ["git", "-C", str(repo_root), "apply", "--3way",
-         "--whitespace=nowarn", str(patch_path)],
-        capture_output=True, text=True, check=False,
-    )
+    # Step 5: apply squash diff with 3-way merge (skip if patch is empty)
+    if patch_path.stat().st_size == 0:
+        print("no local modifications to apply (squash diff was empty)")
+        apply_result = None
+        has_conflicts = False
+    else:
+        print(f"applying local mods with 3-way merge ...")
+        apply_result = subprocess.run(
+            ["git", "-C", str(repo_root), "apply", "--3way",
+             "--whitespace=nowarn", str(patch_path)],
+            capture_output=True, text=True, check=False,
+        )
+        has_conflicts = "with conflicts" in apply_result.stderr.lower() or \
+                        apply_result.returncode != 0
 
     # Step 6: update charts.json (stage it)
     cfg["charts"][args.chart]["version"] = new_version
@@ -120,10 +127,6 @@ def main():
     subprocess.run(
         ["git", "-C", str(repo_root), "add", "charts.json"], check=True,
     )
-
-    # Report
-    has_conflicts = "with conflicts" in apply_result.stderr.lower() or \
-                    apply_result.returncode != 0
     if has_conflicts:
         print()
         print("=" * 60)
@@ -143,7 +146,7 @@ def main():
         print(f"Or to roll back:")
         print(f"  make abort-rebase CHART={args.chart}")
         # Print stderr from git apply for context
-        if apply_result.stderr:
+        if apply_result is not None and apply_result.stderr:
             print()
             print("git apply output:")
             print(apply_result.stderr)

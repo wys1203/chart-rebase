@@ -42,6 +42,21 @@ def main():
         print(f"error: chart {args.chart} not in charts.json", file=sys.stderr)
         return 1
 
+    # Detect in-progress rebase BEFORE touching the working tree.
+    # Use HEAD's charts.json version, not on-disk (which may have been bumped
+    # by `make rebase`).
+    head_version = subprocess.run(
+        ["git", "-C", str(repo_root), "show", f"HEAD:charts.json"],
+        capture_output=True, text=True, check=True,
+    ).stdout
+    import json as _json
+    head_cfg = _json.loads(head_version) if head_version.strip() else {"charts": {}}
+    current_version = head_cfg.get("charts", {}).get(args.chart, {}).get("version", entry["version"])
+    new_tag = find_inprogress_new_tag(repo_root, args.chart, current_version)
+    if not new_tag:
+        print(f"no rebase in progress for {args.chart} (current: vendor/{args.chart}/{current_version})")
+        return 0
+
     # Restore tracked files (chart dir + charts.json) to HEAD state
     print(f"restoring {args.chart}/ and charts.json from HEAD ...")
     subprocess.run(
@@ -56,17 +71,10 @@ def main():
         check=True,
     )
 
-    # Reload config (just restored from HEAD)
-    cfg = _lib.load_config(repo_root / "charts.json")
-    current_version = cfg["charts"][args.chart]["version"]
-    new_tag = find_inprogress_new_tag(repo_root, args.chart, current_version)
-    if new_tag:
-        print(f"deleting in-progress vendor tag: {new_tag}")
-        subprocess.run(
-            ["git", "-C", str(repo_root), "tag", "-d", new_tag], check=True,
-        )
-    else:
-        print("no in-progress vendor tag found (already clean?)")
+    print(f"deleting in-progress vendor tag: {new_tag}")
+    subprocess.run(
+        ["git", "-C", str(repo_root), "tag", "-d", new_tag], check=True,
+    )
 
     print(f"aborted. back at vendor/{args.chart}/{current_version}.")
     return 0

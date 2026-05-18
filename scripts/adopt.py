@@ -119,7 +119,9 @@ def main():
     print(f"updated charts.json")
 
     print()
-    print(f"done. verify with: make diff CHART={args.chart}")
+    print(f"done. next steps:")
+    print(f"  1. commit charts.json:  git add charts.json && git commit -m 'chore: adopt {args.chart}'")
+    print(f"  2. verify local mods:   make diff CHART={args.chart}")
     return 0
 
 

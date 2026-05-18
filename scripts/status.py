@@ -12,7 +12,7 @@ import _lib
 def chart_dirty(repo_root: Path, chart: str) -> bool:
     result = subprocess.run(
         ["git", "-C", str(repo_root), "status", "--porcelain", "--",
-         f"{chart}/", "charts.json"],
+         f"{chart}/"],
         capture_output=True, text=True, check=True,
     )
     return result.stdout.strip() != ""

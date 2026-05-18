@@ -42,3 +42,10 @@ abort-rebase: ## Roll back an in-progress rebase
 
 status: ## Show all charts and their current state
 	@python3 scripts/status.py
+
+check-tools: ## Verify required system tools are installed
+	@command -v python3 >/dev/null || { echo "error: python3 not found"; exit 1; }
+	@command -v curl    >/dev/null || { echo "error: curl not found"; exit 1; }
+	@command -v git     >/dev/null || { echo "error: git not found"; exit 1; }
+	@command -v tar     >/dev/null || { echo "error: tar not found"; exit 1; }
+	@echo "all required tools present"
