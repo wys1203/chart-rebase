@@ -8,6 +8,7 @@ import json
 import os
 import shutil
 import subprocess
+import tarfile
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -262,3 +263,52 @@ def diff_score(local: Path, candidate: Path) -> DiffScore:
             total += len(diff_lines)
             changed += 1
     return DiffScore(total_lines=total, changed_files=changed)
+
+
+def fetch_index(repo_url: str) -> str:
+    """Curl <repo_url>/index.yaml and return its text."""
+    return curl_get(repo_url.rstrip("/") + "/index.yaml")
+
+
+def download_and_extract_chart(
+    repo_root: Path,
+    repo_url: str,
+    chart_name: str,
+    version: str,
+    tarball_url: str,
+) -> Path:
+    """Download and extract a chart tarball.
+
+    Caches the tarball at .cache/<chart_name>-<version>.tgz.
+    Extracts to .work/extracted/<chart_name>-<version>/.
+    Returns the path to the extracted chart root (one level inside, since
+    helm tarballs always contain a single top-level directory == chart_name).
+    """
+    abs_url = resolve_url(repo_url, tarball_url)
+    cache_dir = repo_root / ".cache"
+    work_dir = repo_root / ".work" / "extracted" / f"{chart_name}-{version}"
+    tarball = cache_dir / f"{chart_name}-{version}.tgz"
+
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    if not tarball.exists():
+        curl_download(abs_url, tarball)
+
+    if work_dir.exists():
+        shutil.rmtree(work_dir)
+    work_dir.mkdir(parents=True)
+
+    with tarfile.open(tarball, "r:gz") as tf:
+        tf.extractall(work_dir)
+
+    # helm tarballs always have a single top-level dir == chart_name
+    inner = work_dir / chart_name
+    if not inner.is_dir():
+        # fall back: pick the first directory inside
+        candidates = [p for p in work_dir.iterdir() if p.is_dir()]
+        if len(candidates) == 1:
+            inner = candidates[0]
+        else:
+            raise RuntimeError(
+                f"Unexpected tarball structure for {chart_name}-{version}: {candidates}"
+            )
+    return inner
