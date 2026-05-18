@@ -30,3 +30,6 @@ diff: ## Show local mods vs vendor baseline
 
 patch: ## Emit local mods as patch (default squash; SPLIT=1 for per-commit)
 	@python3 scripts/patch.py --chart $(CHART) $(if $(SPLIT),--split,)
+
+rebase: ## Rebase chart onto a new upstream version
+	@python3 scripts/rebase.py --chart $(CHART) --version $(VERSION)
