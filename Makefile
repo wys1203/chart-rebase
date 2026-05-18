@@ -33,3 +33,6 @@ patch: ## Emit local mods as patch (default squash; SPLIT=1 for per-commit)
 
 rebase: ## Rebase chart onto a new upstream version
 	@python3 scripts/rebase.py --chart $(CHART) --version $(VERSION)
+
+finish-rebase: ## Finalize a successful rebase (commit applied result)
+	@python3 scripts/finish_rebase.py --chart $(CHART)
