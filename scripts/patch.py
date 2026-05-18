@@ -35,7 +35,8 @@ def main():
         out_dir = repo_root / ".work" / "patches" / args.chart
         if out_dir.exists():
             for p in out_dir.iterdir():
-                p.unlink()
+                if p.is_file():
+                    p.unlink()
         out_dir.mkdir(parents=True, exist_ok=True)
         result = subprocess.run(
             ["git", "-C", str(repo_root), "format-patch", f"{tag}..HEAD",
