@@ -4,6 +4,8 @@ Pure stdlib. Wraps curl/git/tar via subprocess for I/O and external tooling.
 """
 
 import json
+import os
+import subprocess
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -105,3 +107,28 @@ def resolve_url(repo_url: str, url: str) -> str:
     if url.startswith("http://") or url.startswith("https://"):
         return url
     return repo_url.rstrip("/") + "/" + url.lstrip("/")
+
+
+def _curl_base_args() -> List[str]:
+    """Build curl base args with optional proxy support from CHART_REBASE_PROXY env."""
+    args = ["curl", "-fsSL"]
+    proxy = os.environ.get("CHART_REBASE_PROXY")
+    if proxy:
+        args.extend(["--proxy", proxy])
+    return args
+
+
+def curl_get(url: str, timeout: int = 60) -> str:
+    """Fetch URL and return body as text. Raises CalledProcessError on HTTP failure."""
+    args = _curl_base_args() + [url]
+    result = subprocess.run(args, check=True, capture_output=True, text=True, timeout=timeout)
+    return result.stdout
+
+
+def curl_download(url: str, dest: Path, timeout: int = 300) -> None:
+    """Download URL to dest. Atomic: writes to dest.tmp then renames."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_suffix(dest.suffix + ".tmp")
+    args = _curl_base_args() + [url, "-o", str(tmp)]
+    subprocess.run(args, check=True, timeout=timeout)
+    tmp.rename(dest)
