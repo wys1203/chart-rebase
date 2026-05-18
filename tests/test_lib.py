@@ -131,5 +131,39 @@ class WorkspaceTests(unittest.TestCase):
             self.assertIn(".work/", lines)
 
 
+class DiffScoreTests(unittest.TestCase):
+    def test_identical_trees_score_zero(self):
+        with TemporaryDirectory() as d:
+            a = Path(d) / "a"
+            b = Path(d) / "b"
+            a.mkdir(); b.mkdir()
+            (a / "f.txt").write_text("hello\nworld\n")
+            (b / "f.txt").write_text("hello\nworld\n")
+            score = _lib.diff_score(a, b)
+            self.assertEqual(score.total_lines, 0)
+            self.assertEqual(score.changed_files, 0)
+
+    def test_one_modified_file(self):
+        with TemporaryDirectory() as d:
+            a = Path(d) / "a"
+            b = Path(d) / "b"
+            a.mkdir(); b.mkdir()
+            (a / "f.txt").write_text("hello\nworld\n")
+            (b / "f.txt").write_text("hello\nthere\n")
+            score = _lib.diff_score(a, b)
+            self.assertGreater(score.total_lines, 0)
+            self.assertEqual(score.changed_files, 1)
+
+    def test_file_only_in_one_side(self):
+        with TemporaryDirectory() as d:
+            a = Path(d) / "a"
+            b = Path(d) / "b"
+            a.mkdir(); b.mkdir()
+            (a / "only.txt").write_text("a\nb\nc\n")
+            score = _lib.diff_score(a, b)
+            self.assertEqual(score.changed_files, 1)
+            self.assertGreaterEqual(score.total_lines, 3)
+
+
 if __name__ == "__main__":
     unittest.main()

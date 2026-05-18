@@ -3,11 +3,13 @@
 Pure stdlib. Wraps curl/git/tar via subprocess for I/O and external tooling.
 """
 
+import difflib
 import json
 import os
 import shutil
 import subprocess
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -214,3 +216,49 @@ def make_orphan_vendor_commit(
         )
 
     return commit_sha
+
+
+@dataclass
+class DiffScore:
+    total_lines: int
+    changed_files: int
+
+
+def _walk_files(root: Path) -> set:
+    files = set()
+    if not root.exists():
+        return files
+    for p in root.rglob("*"):
+        if p.is_file():
+            files.add(str(p.relative_to(root)))
+    return files
+
+
+def _read_text(p: Path) -> list:
+    try:
+        return p.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
+    except FileNotFoundError:
+        return []
+
+
+def diff_score(local: Path, candidate: Path) -> DiffScore:
+    """Compute (total_lines, changed_files) between two directory trees.
+
+    For each file present in either side (relative path union), counts the
+    number of lines in a context-free unified diff. Files missing on one side
+    contribute the entire content of the other side as their score.
+    """
+    paths = _walk_files(local) | _walk_files(candidate)
+    total = 0
+    changed = 0
+    for rel in paths:
+        a = _read_text(local / rel)
+        b = _read_text(candidate / rel)
+        diff_lines = [
+            ln for ln in difflib.unified_diff(a, b, n=0, lineterm="")
+            if ln.startswith(("+", "-")) and not ln.startswith(("+++", "---"))
+        ]
+        if diff_lines:
+            total += len(diff_lines)
+            changed += 1
+    return DiffScore(total_lines=total, changed_files=changed)
