@@ -72,10 +72,10 @@ def list_versions(index_yaml_text: str, chart_name: str) -> List[Tuple[str, str]
             continue
 
         # New version block: "  - apiVersion: ..." (or any "  - ..." line)
+        # helm always puts version/urls on continuation lines, never on this marker
         if line.startswith("  - "):
             flush()
             expecting_url_list = False
-            # fall through to also check this line for fields (rare but safe)
             continue
 
         if line.startswith("    version: "):
