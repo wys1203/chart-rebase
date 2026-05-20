@@ -80,6 +80,7 @@ class IndexReaderTests(unittest.TestCase):
         self.assertEqual(len(versions), 2)
         self.assertEqual(versions[0].version, "1.30.0-rc.0")
         self.assertEqual(versions[0].app_version, "1.30.0-rc.0")
+        self.assertEqual(versions[1].app_version, "1.30.0-beta.0")
 
 
 class UrlResolutionTests(unittest.TestCase):

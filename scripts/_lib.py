@@ -53,7 +53,7 @@ def list_versions_detailed(index_yaml_text: str, chart_name: str) -> List[ChartV
     in_entries = False
     in_target = False
     cur_version: Optional[str] = None
-    cur_app_version: str = ""
+    cur_app_version: str = ""  # "" sentinel: appVersion is optional in index.yaml
     cur_url: Optional[str] = None
     expecting_url_list = False
 
