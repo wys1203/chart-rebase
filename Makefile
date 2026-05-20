@@ -1,4 +1,4 @@
-.PHONY: help adopt rebase finish-rebase abort-rebase diff patch status check-tools
+.PHONY: help adopt rebase finish-rebase abort-rebase diff patch status versions check-tools
 
 CHART ?=
 REPO ?=
@@ -11,6 +11,7 @@ help: ## Show this help
 	@echo ""
 	@echo "Usage:"
 	@echo "  make adopt CHART=<dir> REPO=<url> [NAME=<chart>] [VERSION=<v>]"
+	@echo "  make versions CHART=<dir> | REPO=<url> NAME=<chart>"
 	@echo "  make rebase CHART=<dir> VERSION=<new-version>"
 	@echo "  make finish-rebase CHART=<dir>"
 	@echo "  make abort-rebase CHART=<dir>"
@@ -42,6 +43,10 @@ abort-rebase: ## Roll back an in-progress rebase
 
 status: ## Show all charts and their current state
 	@python3 scripts/status.py
+
+versions: ## List upstream chart versions
+	@python3 scripts/versions.py $(if $(CHART),--chart $(CHART),) \
+		$(if $(REPO),--repo $(REPO),) $(if $(NAME),--name $(NAME),)
 
 check-tools: ## Verify required system tools are installed
 	@command -v python3 >/dev/null || { echo "error: python3 not found"; exit 1; }
