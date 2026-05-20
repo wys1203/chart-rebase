@@ -50,12 +50,15 @@ class E2ETests(unittest.TestCase):
         tgz = FIXTURE_REPO / f"gateway-{version}.tgz"
         with tarfile.open(tgz, "r:gz") as tf:
             tf.extractall(self.scratch)
+        assert (self.scratch / "gateway").is_dir(), \
+            f"fixture tarball for {version} did not extract to gateway/"
         self._git("add", "gateway")
         self._git("commit", "-q", "-m", f"import gateway {version}")
 
     def _adopt_1_12_9(self):
         """Seed gateway 1.12.9, run `make adopt`, commit charts.json."""
         self._seed_gateway("1.12.9")
+        # Explicit VERSION takes adopt.py's non-interactive path (no input() prompt).
         adopt = self._run_make("adopt", CHART="gateway", REPO=REPO_URL,
                                VERSION="1.12.9")
         self.assertEqual(adopt.returncode, 0, adopt.stderr)
