@@ -44,7 +44,7 @@ def main():
     width = max(len("VERSION"), max(len(v.version) for v in versions))
     print(f"{'VERSION':<{width}}  APP VERSION")
     for v in versions:
-        print(f"{v.version:<{width}}  {v.app_version}")
+        print(f"{v.version:<{width}}  {v.app_version}".rstrip())
     print(f"{len(versions)} versions")
     return 0
 
