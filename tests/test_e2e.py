@@ -176,6 +176,39 @@ class E2ETests(unittest.TestCase):
         porcelain = self._git("status", "--porcelain", "--", "gateway").stdout
         self.assertEqual(porcelain.strip(), "")
 
+    def test_conflict_rebase(self):
+        self._adopt_1_12_9()
+
+        # Conflicting mod: edit values.yaml line 2 (`name: ""`). The whole top
+        # of values.yaml is restructured in 1.24.6, so this region cannot
+        # 3-way-merge — the rebase must report a conflict.
+        values = self.scratch / "gateway" / "values.yaml"
+        lines = values.read_text().splitlines(keepends=True)
+        self.assertEqual(lines[1], 'name: ""\n')  # pin the fixture assumption
+        lines[1] = 'name: "e2e-gateway"\n'
+        values.write_text("".join(lines))
+        self._git("add", "gateway")
+        self._git("commit", "-q", "-m", "local mod: gateway name")
+
+        rebase = self._run_make("rebase", CHART="gateway", VERSION="1.24.6")
+        self.assertEqual(rebase.returncode, 0, rebase.stderr)
+        self.assertIn("CONFLICT", rebase.stdout)
+        self.assertIn("<<<<<<< ", values.read_text())
+
+        # finish-rebase must refuse while conflict markers remain
+        refused = self._run_make("finish-rebase", CHART="gateway")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("conflict", refused.stderr.lower())
+
+        # Resolve by taking the upstream 1.24.6 values.yaml verbatim
+        with tarfile.open(FIXTURE_REPO / "gateway-1.24.6.tgz", "r:gz") as tf:
+            resolved = tf.extractfile("gateway/values.yaml").read().decode()
+        values.write_text(resolved)
+
+        finish = self._run_make("finish-rebase", CHART="gateway")
+        self.assertEqual(finish.returncode, 0, finish.stderr)
+        self.assertNotIn("<<<<<<< ", values.read_text())
+
 
 if __name__ == "__main__":
     unittest.main()
