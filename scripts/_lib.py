@@ -34,25 +34,34 @@ def save_config(path: Path, config: dict) -> None:
         f.write("\n")
 
 
-def list_versions(index_yaml_text: str, chart_name: str) -> List[Tuple[str, str]]:
-    """Parse a helm-generated index.yaml and return [(version, url), ...] for chart_name.
+@dataclass
+class ChartVersion:
+    """One chart version entry from a helm index.yaml."""
+    version: str
+    app_version: str
+    url: str
+
+
+def list_versions_detailed(index_yaml_text: str, chart_name: str) -> List[ChartVersion]:
+    """Parse a helm-generated index.yaml and return [ChartVersion, ...] for chart_name.
 
     Targeted line-by-line state machine. Assumes helm's standard 2-space-indent
     output with no flow style, anchors, or multi-line scalars in the captured
     fields. Order in the returned list matches order in the file.
     """
-    out: List[Tuple[str, str]] = []
+    out: List[ChartVersion] = []
     in_entries = False
     in_target = False
     cur_version: Optional[str] = None
+    cur_app_version: str = ""  # "" sentinel: appVersion is optional in index.yaml
     cur_url: Optional[str] = None
     expecting_url_list = False
 
     def flush():
-        nonlocal cur_version, cur_url
+        nonlocal cur_version, cur_app_version, cur_url
         if cur_version is not None:
-            out.append((cur_version, cur_url or ""))
-        cur_version, cur_url = None, None
+            out.append(ChartVersion(cur_version, cur_app_version, cur_url or ""))
+        cur_version, cur_app_version, cur_url = None, "", None
 
     for raw in index_yaml_text.splitlines():
         line = raw.rstrip()
@@ -89,6 +98,10 @@ def list_versions(index_yaml_text: str, chart_name: str) -> List[Tuple[str, str]
             cur_version = line.split("version: ", 1)[1].strip().strip('"')
             continue
 
+        if line.startswith("    appVersion: "):
+            cur_app_version = line.split("appVersion: ", 1)[1].strip().strip('"')
+            continue
+
         if line.strip() == "urls:":
             expecting_url_list = True
             continue
@@ -105,6 +118,17 @@ def list_versions(index_yaml_text: str, chart_name: str) -> List[Tuple[str, str]
     if in_target:
         flush()
     return out
+
+
+def list_versions(index_yaml_text: str, chart_name: str) -> List[Tuple[str, str]]:
+    """Parse a helm-generated index.yaml and return [(version, url), ...] for chart_name.
+
+    Thin wrapper over list_versions_detailed; preserved for existing callers.
+    """
+    return [
+        (v.version, v.url)
+        for v in list_versions_detailed(index_yaml_text, chart_name)
+    ]
 
 
 def resolve_url(repo_url: str, url: str) -> str:

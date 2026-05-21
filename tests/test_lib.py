@@ -64,6 +64,24 @@ class IndexReaderTests(unittest.TestCase):
     def test_list_versions_unknown_chart_returns_empty(self):
         self.assertEqual(_lib.list_versions(self.fixture, "nope"), [])
 
+    def test_list_versions_detailed_for_gateway(self):
+        versions = _lib.list_versions_detailed(self.fixture, "gateway")
+        self.assertEqual(
+            [(v.version, v.app_version, v.url) for v in versions],
+            [
+                ("1.22.0", "1.22.0", "https://example.com/charts/gateway-1.22.0.tgz"),
+                ("1.21.0", "1.21.0", "https://example.com/charts/gateway-1.21.0.tgz"),
+                ("1.20.3", "1.20.3", "relative/gateway-1.20.3.tgz"),
+            ],
+        )
+
+    def test_list_versions_detailed_for_ambient(self):
+        versions = _lib.list_versions_detailed(self.fixture, "ambient")
+        self.assertEqual(len(versions), 2)
+        self.assertEqual(versions[0].version, "1.30.0-rc.0")
+        self.assertEqual(versions[0].app_version, "1.30.0-rc.0")
+        self.assertEqual(versions[1].app_version, "1.30.0-beta.0")
+
 
 class UrlResolutionTests(unittest.TestCase):
     def test_absolute_url_passes_through(self):
