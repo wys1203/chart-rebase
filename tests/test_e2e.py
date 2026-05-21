@@ -149,6 +149,33 @@ class E2ETests(unittest.TestCase):
         cfg = json.loads((self.scratch / "charts.json").read_text())
         self.assertEqual(cfg["charts"]["gateway"]["version"], "1.24.6")
 
+    def test_abort_rebase(self):
+        self._adopt_1_12_9()
+        self._apply_clean_mods()
+        self._git("add", "gateway")
+        self._git("commit", "-q", "-m", "local mods")
+
+        rebase = self._run_make("rebase", CHART="gateway", VERSION="1.24.6")
+        self.assertEqual(rebase.returncode, 0, rebase.stderr)
+
+        abort = self._run_make("abort-rebase", CHART="gateway")
+        self.assertEqual(abort.returncode, 0, abort.stderr)
+
+        gw = self.scratch / "gateway"
+        # committed local mods restored
+        self.assertTrue((gw / "templates" / "e2e-extra.yaml").exists())
+        # upstream-1.24.6-only content removed
+        self.assertFalse((gw / "templates" / "poddisruptionbudget.yaml").exists())
+        # in-progress vendor tag dropped
+        self.assertNotIn("vendor/gateway/1.24.6",
+                         self._git("tag", "-l").stdout.split())
+        # charts.json rolled back to the base version
+        cfg = json.loads((self.scratch / "charts.json").read_text())
+        self.assertEqual(cfg["charts"]["gateway"]["version"], "1.12.9")
+        # working tree clean with respect to gateway/
+        porcelain = self._git("status", "--porcelain", "--", "gateway").stdout
+        self.assertEqual(porcelain.strip(), "")
+
 
 if __name__ == "__main__":
     unittest.main()
