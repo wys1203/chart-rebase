@@ -79,6 +79,76 @@ class E2ETests(unittest.TestCase):
         self.assertIn("1.12.9", r2.stdout)
         self.assertIn("1.24.6", r2.stdout)
 
+    def _apply_clean_mods(self):
+        """Apply local modifications that 3-way-merge cleanly onto 1.24.6.
+
+        - A brand-new template file: a new file can never produce a conflict.
+        - A helper define prepended to _helpers.tpl: lines 1-8 of that file are
+          byte-identical in gateway 1.12.9 and 1.24.6, so a prepend is clean.
+        """
+        extra = self.scratch / "gateway" / "templates" / "e2e-extra.yaml"
+        extra.write_text(
+            "apiVersion: v1\n"
+            "kind: ConfigMap\n"
+            "metadata:\n"
+            "  name: e2e-extra-marker\n"
+            "data:\n"
+            "  source: chart-rebase-e2e\n"
+        )
+        helpers = self.scratch / "gateway" / "templates" / "_helpers.tpl"
+        helpers.write_text(
+            '{{- define "gateway.e2eMarker" -}}\n'
+            "chart-rebase-e2e\n"
+            "{{- end }}\n\n"
+            + helpers.read_text()
+        )
+
+    def test_clean_rebase_workflow(self):
+        self._adopt_1_12_9()
+        self.assertIn("vendor/gateway/1.12.9",
+                      self._git("tag", "-l").stdout.split())
+
+        self._apply_clean_mods()
+        self._git("add", "gateway")
+        self._git("commit", "-q", "-m", "local mods")
+
+        diff = self._run_make("diff", CHART="gateway")
+        self.assertEqual(diff.returncode, 0, diff.stderr)
+        self.assertIn("e2e-extra.yaml", diff.stdout)
+
+        patch = self._run_make("patch", CHART="gateway")
+        self.assertEqual(patch.returncode, 0, patch.stderr)
+        self.assertIn("e2e-extra.yaml", patch.stdout)
+
+        status = self._run_make("status")
+        self.assertEqual(status.returncode, 0, status.stderr)
+        self.assertIn("gateway", status.stdout)
+        self.assertIn("1.12.9", status.stdout)
+
+        rebase = self._run_make("rebase", CHART="gateway", VERSION="1.24.6")
+        self.assertEqual(rebase.returncode, 0, rebase.stderr)
+        self.assertNotIn("CONFLICT", rebase.stdout)
+        self.assertIn("vendor/gateway/1.24.6",
+                      self._git("tag", "-l").stdout.split())
+
+        finish = self._run_make("finish-rebase", CHART="gateway")
+        self.assertEqual(finish.returncode, 0, finish.stderr)
+
+        gw = self.scratch / "gateway"
+        # local mods survived onto the new base
+        self.assertTrue((gw / "templates" / "e2e-extra.yaml").exists())
+        self.assertIn("gateway.e2eMarker",
+                      (gw / "templates" / "_helpers.tpl").read_text())
+        # content unique to upstream 1.24.6 is present (base advanced)
+        self.assertTrue((gw / "templates" / "poddisruptionbudget.yaml").exists())
+        # no conflict markers anywhere
+        for p in gw.rglob("*"):
+            if p.is_file():
+                self.assertNotIn("<<<<<<< ", p.read_text(errors="replace"))
+        # charts.json bumped to the new version
+        cfg = json.loads((self.scratch / "charts.json").read_text())
+        self.assertEqual(cfg["charts"]["gateway"]["version"], "1.24.6")
+
 
 if __name__ == "__main__":
     unittest.main()
