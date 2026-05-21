@@ -28,6 +28,15 @@ def tag_exists(repo_root: Path, tag: str) -> bool:
     return bool(out)
 
 
+def git_lines(repo_root: Path, *args):
+    """Run a git command and return its stdout as a list of non-empty lines."""
+    out = subprocess.run(
+        ["git", "-C", str(repo_root), *args],
+        capture_output=True, text=True, check=True,
+    ).stdout
+    return [ln for ln in out.splitlines() if ln]
+
+
 def main():
     ap = argparse.ArgumentParser(description="Rebase chart onto new upstream version")
     ap.add_argument("--chart", required=True)
@@ -112,9 +121,37 @@ def main():
         ["git", "-C", str(repo_root), "add", "--", f"{args.chart}/"], check=True,
     )
 
+    # Identify locally-modified files that the new upstream no longer ships.
+    # These are modify/delete conflicts: `git apply` cannot place a
+    # modification hunk for a file absent from both the new pristine and the
+    # index, so it errors and silently drops the file. Keep the local version.
+    old_files = set(git_lines(
+        repo_root, "ls-tree", "-r", "--name-only", old_tag,
+        "--", f"{args.chart}/"))
+    new_files = {
+        f"{args.chart}/{p.relative_to(pristine).as_posix()}"
+        for p in pristine.rglob("*") if p.is_file()
+    }
+    locally_changed = set(git_lines(
+        repo_root, "diff", "--name-only", "--diff-filter=d", old_tag, "HEAD",
+        "--", f"{args.chart}/"))
+    kept_local = sorted((old_files - new_files) & locally_changed)
+
+    if kept_local:
+        # Re-capture the squash diff without these files so `git apply` does
+        # not choke on them; they are restored from HEAD after the apply.
+        excludes = [f":(exclude){rel}" for rel in kept_local]
+        with patch_path.open("w") as f:
+            subprocess.run(
+                ["git", "-C", str(repo_root), "diff", old_tag, "HEAD", "--",
+                 f"{args.chart}/", *excludes],
+                stdout=f, check=True,
+            )
+
     # Step 5: apply squash diff with 3-way merge (skip if patch is empty)
     if patch_path.stat().st_size == 0:
-        print("no local modifications to apply (squash diff was empty)")
+        if not kept_local:
+            print("no local modifications to apply (squash diff was empty)")
         apply_result = None
         has_conflicts = False
     else:
@@ -126,6 +163,15 @@ def main():
         )
         has_conflicts = "with conflicts" in apply_result.stderr.lower() or \
                         apply_result.returncode != 0
+
+    # Restore locally-modified files that the new upstream removed. Step 4
+    # deleted them along with the rest of the old pristine; HEAD still has
+    # them with their local modifications.
+    for rel in kept_local:
+        subprocess.run(
+            ["git", "-C", str(repo_root), "checkout", "HEAD", "--", rel],
+            check=True,
+        )
 
     # Restore the index for <chart>/ to HEAD. The staging above was only to
     # satisfy `git apply --3way`; leaving the index at HEAD keeps the merged
@@ -143,6 +189,14 @@ def main():
     subprocess.run(
         ["git", "-C", str(repo_root), "add", "charts.json"], check=True,
     )
+    if kept_local:
+        print()
+        print(f"kept {len(kept_local)} locally-modified file(s) that upstream "
+              f"{new_version} removed:")
+        for rel in kept_local:
+            print(f"  {rel}")
+        print("  (local version preserved; `git rm` them if no longer needed)")
+
     if has_conflicts:
         print()
         print("=" * 60)
