@@ -105,6 +105,12 @@ def main():
     if target.exists():
         shutil.rmtree(target)
     shutil.copytree(pristine, target)
+    # Stage the new pristine so `git apply --3way` sees a consistent index:
+    # without this, git apply rejects every modified file with
+    # "does not match index" and never reaches the 3-way merge.
+    subprocess.run(
+        ["git", "-C", str(repo_root), "add", "--", f"{args.chart}/"], check=True,
+    )
 
     # Step 5: apply squash diff with 3-way merge (skip if patch is empty)
     if patch_path.stat().st_size == 0:
@@ -120,6 +126,16 @@ def main():
         )
         has_conflicts = "with conflicts" in apply_result.stderr.lower() or \
                         apply_result.returncode != 0
+
+    # Restore the index for <chart>/ to HEAD. The staging above was only to
+    # satisfy `git apply --3way`; leaving the index at HEAD keeps the merged
+    # result purely in the working tree, so `make abort-rebase` can still
+    # `git clean` the new upstream files and `make finish-rebase` stages the
+    # final result itself.
+    subprocess.run(
+        ["git", "-C", str(repo_root), "reset", "-q", "HEAD", "--", f"{args.chart}/"],
+        check=True,
+    )
 
     # Step 6: update charts.json (stage it)
     cfg["charts"][args.chart]["version"] = new_version
